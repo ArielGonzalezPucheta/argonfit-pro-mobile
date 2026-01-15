@@ -26,11 +26,11 @@ jobs:
       - name: Capacitor sync Android
         run: npx cap sync android
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Build Android App Bundle
         working-directory: android
