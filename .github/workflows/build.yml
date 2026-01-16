@@ -28,9 +28,12 @@ jobs:
       - name: Capacitor sync Android
         run: npx cap sync android
 
+      # CORREGIDO: Crear keystore REAL
       - name: Decode keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > argonfit.keystore
+          echo "$ANDROID_KEYSTORE_B64" | base64 --decode > android/argonfit.keystore
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
 
       - name: Setup Java 21
         uses: actions/setup-java@v4
@@ -44,22 +47,26 @@ jobs:
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=../argonfit.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEYSTORE_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}
+            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Build Signed APK
         working-directory: android
         run: |
           ./gradlew assembleRelease \
             -Pandroid.injected.signing.store.file=../argonfit.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=${{ secrets.ANDROID_KEYSTORE_ALIAS }} \
-            -Pandroid.injected.signing.key.password=${{ secrets.ANDROID_KEY_PASSWORD }}
-
-      - name: Create ZIP with artifacts
-        run: |
-          zip artifacts.zip android/app/build/outputs/bundle/release/*.aab android/app/build/outputs/apk/release/*.apk
+            -Pandroid.injected.signing.store.password=$ANDROID_KEYSTORE_PASSWORD \
+            -Pandroid.injected.signing.key.alias=$ANDROID_KEY_ALIAS \
+            -Pandroid.injected.signing.key.password=$ANDROID_KEY_PASSWORD
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
@@ -72,19 +79,5 @@ jobs:
         with:
           name: ARGONFIT-PRO-APK-SIGNED
           path: android/app/build/outputs/apk/release/*.apk
-
-      - name: Upload ZIP artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ARGONFIT-PRO-ARTIFACTS-ZIP
-          path: artifacts.zip
-
-      - name: Print download instructions
-        run: |
-          echo "Para descargar:"
-          echo "gh run list --workflow='Android Build'"
-          echo "gh run download <RUN_ID> -n ARGONFIT-PRO-AAB-SIGNED"
-          echo "gh run download <RUN_ID> -n ARGONFIT-PRO-APK-SIGNED"
-          echo "gh run download <RUN_ID> -n ARGONFIT-PRO-ARTIFACTS-ZIP"
 
 
