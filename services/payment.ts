@@ -142,12 +142,18 @@ export const paymentService = {
             throw new Error("Payment System Offline: Supabase not configured.");
         }
 
+        const { data: user } = await supabase.auth.getUser();
+        if (!user.user) {
+            throw new Error("Usuario no autenticado.");
+        }
+
         try {
             // 2. Call Edge Function
             const { data, error } = await supabase.functions.invoke('create-checkout', {
                 body: {
                     planId,
                     provider,
+                    userId: user.user.id,
                     successUrl: `${window.location.origin}/?payment=success`,
                     cancelUrl: `${window.location.origin}/subscription?payment=cancelled`
                 }
@@ -172,6 +178,51 @@ export const paymentService = {
         } catch (e: any) {
             console.error("Payment Gateway Error:", e);
             throw new Error(e.message || "Could not initiate checkout.");
+        }
+    },
+
+    initiateDonation: async (amount: number, currency: string, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
+        // 1. Force backend usage
+        if (!isSupabaseConfigured) {
+            throw new Error("Payment System Offline: Supabase not configured.");
+        }
+
+        const { data: user } = await supabase.auth.getUser();
+        if (!user.user) {
+            throw new Error("Usuario no autenticado.");
+        }
+
+        try {
+            // 2. Call Edge Function
+            const { data, error } = await supabase.functions.invoke('create-checkout', {
+                body: {
+                    type: 'donation',
+                    amount,
+                    currency,
+                    provider,
+                    userId: user.user.id,
+                    successUrl: `${window.location.origin}/?payment=success`,
+                    cancelUrl: `${window.location.origin}/subscription?payment=cancelled`
+                }
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+
+            if (data?.url) {
+                return { url: data.url, status: 'redirecting' };
+            }
+
+            throw new Error("Invalid response from Payment Gateway");
+
+        } catch (e: any) {
+            console.error("Donation Gateway Error:", e);
+            throw new Error(e.message || "Could not initiate donation.");
         }
     },
 

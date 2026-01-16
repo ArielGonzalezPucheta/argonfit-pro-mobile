@@ -13,10 +13,10 @@ serve(async (req) => {
   }
 
   try {
-    const { planId } = await req.json()
+    const { planId, type, amount, currency, userId } = await req.json()
 
-    if (!planId) {
-      throw new Error('Plan ID is required (pro or elite)')
+    if (!planId && !type) {
+      throw new Error('Plan ID or type is required')
     }
 
     const accessToken = Deno.env.get('MP_ACCESS_TOKEN')
@@ -29,21 +29,34 @@ serve(async (req) => {
     const client = new MercadoPagoConfig({ accessToken: accessToken });
     const preference = new Preference(client);
 
-    // Define Plan
     let title = "Argon Fit Subscription"
     let unit_price = 100
+    let currency_id = 'ARS'
 
-    switch (planId) {
-      case 'pro':
-        title = "Argon Fit - Pro Athlete Plan (Monthly)";
-        unit_price = 9900;
-        break;
-      case 'elite':
-        title = "Argon Fit - Elite Protocol Plan (Monthly)";
-        unit_price = 18900;
-        break;
-      default:
-        throw new Error(`Invalid plan: ${planId}`)
+    if (type === 'donation') {
+      if (!amount || !currency) {
+        throw new Error('Amount and currency are required for donations')
+      }
+      if (amount <= 0) {
+        throw new Error('Amount must be greater than 0')
+      }
+      title = "Donación a Argon Fit"
+      unit_price = Number(amount)
+      currency_id = currency
+    } else {
+      // Existing plan logic
+      switch (planId) {
+        case 'pro':
+          title = "Argon Fit - Pro Athlete Plan (Monthly)";
+          unit_price = 9900;
+          break;
+        case 'elite':
+          title = "Argon Fit - Elite Protocol Plan (Monthly)";
+          unit_price = 18900;
+          break;
+        default:
+          throw new Error(`Invalid plan: ${planId}`)
+      }
     }
 
     // STRICT URL HARDCODING (Fixes "back_url.success must be defined")
@@ -60,15 +73,17 @@ serve(async (req) => {
       body: {
         items: [
           {
-            id: planId,
+            id: type === 'donation' ? 'donation' : planId,
             title: title,
             quantity: 1,
             unit_price: unit_price,
-            currency_id: 'ARS',
+            currency_id: currency_id,
           }
         ],
         back_urls: backUrls,
         auto_return: 'approved',
+        external_reference: userId,
+        metadata: type === 'donation' ? { type: 'donation' } : { plan_id: planId }
       }
     })
 

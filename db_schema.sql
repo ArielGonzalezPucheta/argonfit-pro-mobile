@@ -38,6 +38,24 @@ create table public.subscriptions (
   created_at timestamptz default now()
 );
 
+-- DONATIONS
+create table public.donations (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references public.profiles(id) on delete set null,
+  provider text, -- 'mercadopago'
+  external_id text,
+  amount numeric not null,
+  currency text not null,
+  status text not null,
+  created_at timestamptz default now()
+);
+
+-- RLS for Donations
+alter table public.donations enable row level security;
+
+create policy "Users can view own donations" on public.donations
+  for select using (auth.uid() = user_id);
+
 -- RLS for Subscriptions (Admin/Service Role only usually, but let's allow read for user)
 alter table public.subscriptions enable row level security;
 

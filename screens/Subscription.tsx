@@ -6,6 +6,7 @@ import { storage } from '../services/storage';
 import { PLANS, paymentService, PlanConfig, PaymentProvider } from '../services/payment';
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
 import { useNavigate } from 'react-router-dom';
+import { Browser } from '@capacitor/browser';
 
 // Logo SVG de Mercado Pago
 const MPLogo = () => (
@@ -25,6 +26,8 @@ export const Subscription = () => {
     const [waitingForPayment, setWaitingForPayment] = useState(false);
     const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<PlanConfig | null>(null);
     const [manualPaymentInfo, setManualPaymentInfo] = useState<PaymentProvider | null>(null);
+    const [donationAmount, setDonationAmount] = useState('');
+    const [donationCurrency, setDonationCurrency] = useState<'ARS' | 'USD'>('ARS');
     const navigate = useNavigate();
 
     const currentPlan = state.profile?.subscription?.plan || 'free';
@@ -108,7 +111,7 @@ export const Subscription = () => {
             const { url, status } = await paymentService.initiateCheckout(selectedPlanForPayment.id, provider);
 
             if (status === 'redirecting' && url) {
-                window.location.href = url;
+                await Browser.open({ url });
                 setWaitingForPayment(true);
                 setLoading(null);
             } else if (status === 'manual') {
@@ -122,6 +125,33 @@ export const Subscription = () => {
             console.error("Payment error", error);
             setLoading(null);
             alert(`Error iniciando el pago: ${error.message || "Verifica tu conexión."}`);
+        }
+    };
+
+    const handleDonation = async (provider: PaymentProvider) => {
+        const amount = parseFloat(donationAmount);
+        if (!amount || amount <= 0) {
+            alert("Ingresa un monto válido mayor a 0.");
+            return;
+        }
+
+        setLoading('donation');
+
+        try {
+            const { url, status } = await paymentService.initiateDonation(amount, donationCurrency, provider);
+
+            if (status === 'redirecting' && url) {
+                await Browser.open({ url });
+                setWaitingForPayment(true);
+                setLoading(null);
+            } else {
+                alert("Donación procesada exitosamente.");
+            }
+
+        } catch (error: any) {
+            console.error("Donation error", error);
+            setLoading(null);
+            alert(`Error iniciando la donación: ${error.message || "Verifica tu conexión."}`);
         }
     };
 
@@ -398,6 +428,69 @@ export const Subscription = () => {
 
                 <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
                     <PlanCard plan={PLANS.elite} />
+                </motion.div>
+            </div>
+
+            {/* DONATION SECTION */}
+            <div className="mt-16 max-w-2xl mx-auto px-4 md:px-8">
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4 }}
+                    className="bg-gradient-to-b from-zinc-900/50 to-zinc-950/50 border border-zinc-800/50 rounded-2xl p-8 text-center"
+                >
+                    <div className="mb-6">
+                        <h3 className="text-2xl font-bold text-white mb-2">Apoya el Desarrollo</h3>
+                        <p className="text-zinc-400 text-sm">Tu donación ayuda a mantener y mejorar Argon Fit. ¡Gracias por tu apoyo!</p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                        <div className="flex-1">
+                            <label className="block text-xs font-medium text-zinc-400 mb-2">Monto</label>
+                            <input
+                                type="number"
+                                value={donationAmount}
+                                onChange={(e) => setDonationAmount(e.target.value)}
+                                placeholder="Ej: 1000"
+                                className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-3 text-white placeholder-zinc-500 focus:outline-none focus:border-zinc-500"
+                                min="1"
+                                step="0.01"
+                            />
+                        </div>
+                        <div className="sm:w-32">
+                            <label className="block text-xs font-medium text-zinc-400 mb-2">Moneda</label>
+                            <select
+                                value={donationCurrency}
+                                onChange={(e) => setDonationCurrency(e.target.value as 'ARS' | 'USD')}
+                                className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-zinc-500"
+                            >
+                                <option value="ARS">ARS</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <Button
+                        onClick={() => handleDonation('mercadopago')}
+                        disabled={loading === 'donation' || !donationAmount}
+                        className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {loading === 'donation' ? (
+                            <div className="flex items-center justify-center gap-2">
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                Procesando...
+                            </div>
+                        ) : (
+                            <>
+                                <MPLogo />
+                                Donar
+                            </>
+                        )}
+                    </Button>
+
+                    <p className="text-xs text-zinc-500 mt-4">
+                        Las donaciones no otorgan beneficios Premium ni acceso adicional.
+                    </p>
                 </motion.div>
             </div>
 

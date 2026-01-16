@@ -58,57 +58,72 @@ serve(async (req) => {
         // Fallback to metadata if external_reference is missing
         const targetUserId = userId || payment.metadata?.user_id;
         const planId = payment.metadata?.plan_id || 'pro'; 
+        const isDonation = payment.metadata?.type === 'donation';
 
         if (targetUserId) {
-            console.log(`Processing subscription for User ${targetUserId} - Plan ${planId}`);
+            if (isDonation) {
+                console.log(`Processing donation for User ${targetUserId} - Amount ${payment.transaction_amount} ${payment.currency_id}`);
 
-            const startDate = new Date();
-            const endDate = new Date();
-            endDate.setDate(endDate.getDate() + 30); // 30 Days Subscription
+                // Insert Donation
+                await supabaseAdmin.from('donations').insert({
+                    user_id: targetUserId,
+                    provider: 'mercadopago',
+                    external_id: String(payment.id),
+                    amount: payment.transaction_amount,
+                    currency: payment.currency_id,
+                    status: payment.status
+                });
+            } else {
+                console.log(`Processing subscription for User ${targetUserId} - Plan ${planId}`);
 
-            // A. Insert Audit Log
-            await supabaseAdmin.from('subscriptions').insert({
-                user_id: targetUserId,
-                provider: 'mercadopago',
-                external_id: String(payment.id),
-                plan_id: planId,
-                status: 'active',
-                amount: payment.transaction_amount,
-                currency: payment.currency_id,
-                period_start: startDate.toISOString(),
-                period_end: endDate.toISOString()
-            });
+                const startDate = new Date();
+                const endDate = new Date();
+                endDate.setDate(endDate.getDate() + 30); // 30 Days Subscription
 
-            // B. Update User Profile (JSONB Data)
-            // This is critical for the Frontend to react immediately upon hydration
-            const { data: currentProfile } = await supabaseAdmin
-                .from('profiles')
-                .select('data')
-                .eq('id', targetUserId)
-                .single();
+                // A. Insert Audit Log
+                await supabaseAdmin.from('subscriptions').insert({
+                    user_id: targetUserId,
+                    provider: 'mercadopago',
+                    external_id: String(payment.id),
+                    plan_id: planId,
+                    status: 'active',
+                    amount: payment.transaction_amount,
+                    currency: payment.currency_id,
+                    period_start: startDate.toISOString(),
+                    period_end: endDate.toISOString()
+                });
 
-            if (currentProfile && currentProfile.data) {
-                const updatedData = {
-                    ...currentProfile.data,
-                    profile: {
-                        ...currentProfile.data.profile,
-                        subscription: {
-                            plan: planId,
-                            status: 'active',
-                            startDate: startDate.toISOString(),
-                            validUntil: endDate.toISOString(),
-                            autoRenew: true
-                        }
-                    }
-                };
-
-                await supabaseAdmin
+                // B. Update User Profile (JSONB Data)
+                // This is critical for the Frontend to react immediately upon hydration
+                const { data: currentProfile } = await supabaseAdmin
                     .from('profiles')
-                    .update({ 
-                        data: updatedData,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', targetUserId);
+                    .select('data')
+                    .eq('id', targetUserId)
+                    .single();
+
+                if (currentProfile && currentProfile.data) {
+                    const updatedData = {
+                        ...currentProfile.data,
+                        profile: {
+                            ...currentProfile.data.profile,
+                            subscription: {
+                                plan: planId,
+                                status: 'active',
+                                startDate: startDate.toISOString(),
+                                validUntil: endDate.toISOString(),
+                                autoRenew: true
+                            }
+                        }
+                    };
+
+                    await supabaseAdmin
+                        .from('profiles')
+                        .update({ 
+                            data: updatedData,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', targetUserId);
+                }
             }
         }
     }
