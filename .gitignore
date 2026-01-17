@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+*.apk
+*.aab
+*.keystore
+*.jks
+keystore.b64
