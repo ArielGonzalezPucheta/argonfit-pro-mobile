@@ -83,6 +83,7 @@ serve(async (req) => {
         back_urls: backUrls,
         auto_return: 'approved',
         external_reference: userId,
+        notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/webhook`,
         metadata: type === 'donation' ? { type: 'donation' } : { plan_id: planId }
       }
     })

@@ -137,34 +137,23 @@ export const paymentService = {
     },
 
     initiateCheckout: async (planId: PlanTier, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
-        // 1. Force backend usage - No offline/manual mode allowed for Premium
-        if (!isSupabaseConfigured) {
-            throw new Error("Payment System Offline: Supabase not configured.");
-        }
-
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) {
-            throw new Error("Usuario no autenticado.");
-        }
-
         try {
-            // 2. Call Edge Function
+            const { data: user } = await supabase.auth.getUser();
+            if (!user.user) {
+                throw new Error("Usuario no autenticado.");
+            }
+
+            const plan = PLANS[planId];
+            const amount = plan.price;
+
             const { data, error } = await supabase.functions.invoke('create-checkout', {
-                body: {
-                    planId,
-                    provider,
-                    userId: user.user.id,
-                    successUrl: `${window.location.origin}/?payment=success`,
-                    cancelUrl: `${window.location.origin}/subscription?payment=cancelled`
-                }
+                body: { planId, userId: user.user.id, amount }
             });
 
             if (error) {
-                // Network/System error (rare with soft-error pattern but possible)
                 throw error;
             }
 
-            // Handle Soft Errors from backend (e.g. Missing Env Vars)
             if (data?.error) {
                 throw new Error(data.error);
             }
@@ -174,36 +163,21 @@ export const paymentService = {
             }
 
             throw new Error("Invalid response from Payment Gateway");
-
         } catch (e: any) {
             console.error("Payment Gateway Error:", e);
-            throw new Error(e.message || "Could not initiate checkout.");
+            return { url: '', status: 'manual' };
         }
     },
 
     initiateDonation: async (amount: number, currency: string, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
-        // 1. Force backend usage
-        if (!isSupabaseConfigured) {
-            throw new Error("Payment System Offline: Supabase not configured.");
-        }
-
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) {
-            throw new Error("Usuario no autenticado.");
-        }
-
         try {
-            // 2. Call Edge Function
+            const { data: user } = await supabase.auth.getUser();
+            if (!user.user) {
+                throw new Error("Usuario no autenticado.");
+            }
+
             const { data, error } = await supabase.functions.invoke('create-checkout', {
-                body: {
-                    type: 'donation',
-                    amount,
-                    currency,
-                    provider,
-                    userId: user.user.id,
-                    successUrl: `${window.location.origin}/?payment=success`,
-                    cancelUrl: `${window.location.origin}/subscription?payment=cancelled`
-                }
+                body: { type: 'donation', amount, currency, userId: user.user.id }
             });
 
             if (error) {
@@ -219,18 +193,35 @@ export const paymentService = {
             }
 
             throw new Error("Invalid response from Payment Gateway");
-
         } catch (e: any) {
-            console.error("Donation Gateway Error:", e);
-            throw new Error(e.message || "Could not initiate donation.");
+            console.error("Donation Error:", e);
+            return { url: '', status: 'manual' };
         }
     },
 
-    getDaysLeft: (profile: UserProfile): number => {
-        if (!profile.subscription) return 0;
-        const now = new Date().getTime();
-        const end = new Date(profile.subscription.validUntil).getTime();
-        const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
-        return Math.max(0, diff);
+    getUserStatus: async (): Promise<{ premium: boolean }> => {
+        try {
+            const { data: user } = await supabase.auth.getUser();
+            if (!user.user) {
+                throw new Error("Usuario no autenticado.");
+            }
+
+            const { data, error } = await supabase.functions.invoke('user-status', {
+                body: { userId: user.user.id }
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            if (data?.error) {
+                throw new Error(data.error);
+            }
+
+            return data;
+        } catch (e: any) {
+            console.error("Status Error:", e);
+            return { premium: false };
+        }
     }
 };

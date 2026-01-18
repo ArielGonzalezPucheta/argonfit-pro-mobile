@@ -100,7 +100,34 @@ export const Subscription = () => {
         // In a real app, this would POST to /api/validate-payment
         console.log(`Payment Validated: ${transactionId} for ${selectedPlanForPayment?.id}`);
 
-        finalizeLocalUpgrade();
+        // Consultar status real del backend
+        const { premium } = await paymentService.getUserStatus();
+        if (premium) {
+            // Actualizar state local
+            const durationMonths = billingCycle === 'yearly' ? 12 : 1;
+            const newExpiry = new Date();
+            newExpiry.setMonth(newExpiry.getMonth() + durationMonths);
+
+            setState(prev => ({
+                ...prev,
+                profile: {
+                    ...prev.profile!,
+                    subscription: {
+                        plan: selectedPlanForPayment!.id,
+                        status: 'active' as const,
+                        startDate: new Date().toISOString(),
+                        validUntil: newExpiry.toISOString(),
+                        autoRenew: true
+                    }
+                }
+            }));
+            setWaitingForPayment(false);
+            setVerifying(false);
+            alert("¡Pago aprobado! Premium activado.");
+        } else {
+            setValidationError("Pago no aprobado. Verifica el ID o intenta nuevamente.");
+            setVerifying(false);
+        }
     };
 
     const handleExecutePayment = async (provider: PaymentProvider) => {
@@ -118,7 +145,8 @@ export const Subscription = () => {
                 setManualPaymentInfo(provider);
                 setLoading(null);
             } else {
-                finalizeLocalUpgrade();
+                // No finalize
+                setLoading(null);
             }
 
         } catch (error: any) {
@@ -143,6 +171,9 @@ export const Subscription = () => {
             if (status === 'redirecting' && url) {
                 await Browser.open({ url });
                 setWaitingForPayment(true);
+                setLoading(null);
+            } else if (status === 'manual') {
+                setManualPaymentInfo(provider);
                 setLoading(null);
             } else {
                 alert("Donación procesada exitosamente.");
