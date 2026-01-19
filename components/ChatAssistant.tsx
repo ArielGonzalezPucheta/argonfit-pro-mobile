@@ -8,7 +8,7 @@ import { Button, Card, Badge } from './UI';
 
 export const ChatAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<{role: 'user' | 'ai', content: string, routineData?: any}[]>([
+  const [messages, setMessages] = useState<{ role: 'user' | 'ai', content: string, routineData?: any }[]>([
     { role: 'ai', content: 'Hola. Soy Argon Coach. Puedo responder tus dudas o crear rutinas personalizadas. ¿En qué te ayudo?' }
   ]);
   const [input, setInput] = useState('');
@@ -25,7 +25,7 @@ export const ChatAssistant = () => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
-    
+
     const userMsg = input;
     setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
     setInput('');
@@ -35,10 +35,10 @@ export const ChatAssistant = () => {
     const response = await aiService.chatWithCoach(userMsg, state);
 
     setIsTyping(false);
-    setMessages(prev => [...prev, { 
-      role: 'ai', 
-      content: response.text, 
-      routineData: response.routine 
+    setMessages(prev => [...prev, {
+      role: 'ai',
+      content: response.text,
+      routineData: response.routine
     }]);
   };
 
@@ -87,12 +87,12 @@ export const ChatAssistant = () => {
             {/* Header */}
             <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
-                <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/></svg>
+                <svg className="w-5 h-5 text-black" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" /></svg>
               </div>
               <div>
                 <h3 className="font-black italic text-white uppercase tracking-wider">Argon Coach</h3>
                 <p className="text-[10px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"/> En línea
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> En línea
                 </p>
               </div>
             </div>
@@ -101,17 +101,16 @@ export const ChatAssistant = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth" ref={scrollRef}>
               {messages.map((msg, idx) => (
                 <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-emerald-500 text-black font-medium rounded-tr-sm' 
+                  <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
+                      ? 'bg-emerald-500 text-black font-medium rounded-tr-sm'
                       : 'bg-white/10 text-zinc-200 rounded-tl-sm'
-                  }`}>
+                    }`}>
                     {msg.content}
                   </div>
-                  
+
                   {/* Routine Preview Card */}
                   {msg.routineData && (
-                    <motion.div 
+                    <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="mt-3 w-full max-w-[85%] bg-zinc-900 border border-emerald-500/30 rounded-2xl p-4 space-y-3"
@@ -159,7 +158,7 @@ export const ChatAssistant = () => {
                   placeholder="Pide una rutina o haz una pregunta..."
                   className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:border-emerald-500/50 transition-all placeholder:text-zinc-600"
                 />
-                <button 
+                <button
                   onClick={handleSend}
                   disabled={!input.trim() || isTyping}
                   className="bg-emerald-500 text-black w-12 rounded-xl flex items-center justify-center hover:bg-emerald-400 disabled:opacity-50 transition-all"

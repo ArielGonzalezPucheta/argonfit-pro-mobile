@@ -136,27 +136,38 @@ export const paymentService = {
         };
     },
 
-    initiateCheckout: async (planId: PlanTier, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
+    initiateCheckout: async (planId: PlanTier, profileId: string, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
+        // 1. Force backend usage - No offline/manual mode allowed for Premium
+        if (!isSupabaseConfigured) {
+            throw new Error("Payment System Offline: Supabase not configured.");
+        }
+
         try {
-            const { data: user } = await supabase.auth.getUser();
-            if (!user.user) {
-                throw new Error("Usuario no autenticado.");
+            // We use the passed profileId or fetch from auth as backup
+            let targetUserId = profileId;
+            if (!targetUserId) {
+                const { data: user } = await supabase.auth.getUser();
+                if (user.user) targetUserId = user.user.id;
             }
+
+            if (!targetUserId) throw new Error("Usuario no autenticado.");
 
             const plan = PLANS[planId];
             const amount = plan.price;
 
             const { data, error } = await supabase.functions.invoke('create-checkout', {
-                body: { planId, userId: user.user.id, amount }
+                body: {
+                    planId,
+                    provider,
+                    userId: targetUserId,
+                    amount,
+                    // Back URLs are handled in the Edge Function now, but we can pass them if needed. 
+                    // The EF enforces hardcoded ones for security, so we omit them here to reduce payload.
+                }
             });
 
-            if (error) {
-                throw error;
-            }
-
-            if (data?.error) {
-                throw new Error(data.error);
-            }
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
             if (data?.url) {
                 return { url: data.url, status: 'redirecting' };
@@ -169,24 +180,32 @@ export const paymentService = {
         }
     },
 
-    initiateDonation: async (amount: number, currency: string, provider: PaymentProvider): Promise<{ url: string, status: 'redirecting' | 'manual' | 'success' }> => {
+    createDonationCheckout: async (amount: number, provider: PaymentProvider = 'mercadopago'): Promise<{ url: string, status: 'redirecting' | 'success' }> => {
+        if (!isSupabaseConfigured) {
+            throw new Error("Payment System Offline: Supabase not configured.");
+        }
+
+        if (!amount || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+            throw new Error("Monto de donación inválido.");
+        }
+
         try {
+            // Optional: attach user ID if signed in, but allow anonymous too (EF handles null userId)
             const { data: user } = await supabase.auth.getUser();
-            if (!user.user) {
-                throw new Error("Usuario no autenticado.");
-            }
+            const userId = user?.user?.id;
 
             const { data, error } = await supabase.functions.invoke('create-checkout', {
-                body: { type: 'donation', amount, currency, userId: user.user.id }
+                body: {
+                    mode: 'donation', // REQUIRED
+                    type: 'donation', // REQUIRED
+                    amount,
+                    provider,
+                    userId, // Optional
+                }
             });
 
-            if (error) {
-                throw error;
-            }
-
-            if (data?.error) {
-                throw new Error(data.error);
-            }
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
             if (data?.url) {
                 return { url: data.url, status: 'redirecting' };
@@ -195,7 +214,7 @@ export const paymentService = {
             throw new Error("Invalid response from Payment Gateway");
         } catch (e: any) {
             console.error("Donation Error:", e);
-            return { url: '', status: 'manual' };
+            throw new Error(e.message || "Could not initiate donation.");
         }
     },
 
@@ -210,18 +229,21 @@ export const paymentService = {
                 body: { userId: user.user.id }
             });
 
-            if (error) {
-                throw error;
-            }
-
-            if (data?.error) {
-                throw new Error(data.error);
-            }
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
             return data;
         } catch (e: any) {
             console.error("Status Error:", e);
             return { premium: false };
         }
+    },
+
+    getDaysLeft: (profile: UserProfile): number => {
+        if (!profile.subscription) return 0;
+        const now = new Date().getTime();
+        const end = new Date(profile.subscription.validUntil).getTime();
+        const diff = Math.ceil((end - now) / (1000 * 3600 * 24));
+        return Math.max(0, diff);
     }
 };

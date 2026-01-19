@@ -76,22 +76,38 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const [paymentStatus, setPaymentStatus] = useState<'success' | 'cancelled' | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
+    // Check both hash search (Router) AND main window search (Direct landing from MP)
+    const params = new URLSearchParams(location.search || window.location.search);
     const payment = params.get('payment');
+    const type = params.get('type');
+
     if (payment === 'success') {
       setPaymentStatus('success');
-      // Clean URL
-      window.history.replaceState({}, '', window.location.pathname);
-      // Optional: Trigger profile refresh
+
+      // If we landed on the root from MP, we might want to navigate to the right hash route
+      if (window.location.search.includes('payment=success')) {
+        // Clean the main URL search part
+        window.history.replaceState({}, '', window.location.origin + window.location.hash);
+
+        if (type === 'donation') {
+          alert("¡Gracias por apoyar el proyecto! ❤️");
+          navigate('/subscription', { replace: true });
+        } else {
+          navigate('/subscription', { replace: true });
+        }
+      }
+
       storage.hydrateFromCloud().then(() => setState(storage.load()));
-      // Auto-hide after 5 seconds
       setTimeout(() => setPaymentStatus(null), 5000);
     } else if (payment === 'cancelled') {
       setPaymentStatus('cancelled');
-      window.history.replaceState({}, '', window.location.pathname);
+      if (window.location.search.includes('payment=cancelled')) {
+        window.history.replaceState({}, '', window.location.origin + window.location.hash);
+        navigate('/subscription', { replace: true });
+      }
       setTimeout(() => setPaymentStatus(null), 5000);
     }
-  }, [location]);
+  }, [location, navigate]);
 
   const isAuthPage = location.pathname === '/auth';
   const plan = state.profile?.subscription?.plan || 'free';
@@ -155,7 +171,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 </div>
               </div>
 
-              <nav className="flex flex-col gap-2 mt-2">
+              <nav className="flex-1 flex flex-col gap-2 mt-2">
                 <SidebarItem to="/" icon={ICONS.Dashboard} label="Inicio" onClick={() => setIsMobileMenuOpen(false)} />
                 <SidebarItem to="/routines" icon={ICONS.Routines} label="Rutinas" onClick={() => setIsMobileMenuOpen(false)} />
                 <SidebarItem to="/nutrition" icon={ICONS.Nutrition} label="Nutrición" onClick={() => setIsMobileMenuOpen(false)} />
@@ -164,15 +180,36 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                 <SidebarItem to="/calendar" icon={ICONS.Calendar} label="Calendario" onClick={() => setIsMobileMenuOpen(false)} />
                 <SidebarItem to="/profile" icon={ICONS.Profile} label="Perfil" onClick={() => setIsMobileMenuOpen(false)} />
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group text-zinc-500 hover:text-white hover:bg-white/5"
-                >
-                  <span className="transition-transform group-hover:scale-110 text-red-500 group-hover:text-red-400">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                  </span>
-                  <span className="font-medium">Cerrar Sesión</span>
-                </button>
+                <div className="px-2 mt-2">
+                  <motion.button
+                    whileHover={{ scale: 1.02, boxShadow: "0 0 25px rgba(16, 185, 129, 0.3)" }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => { navigate('/subscription?target=donation'); setIsMobileMenuOpen(false); }}
+                    className="w-full flex items-center justify-center gap-3 bg-gradient-to-br from-emerald-400 to-emerald-600 text-black py-4 rounded-2xl transition-all relative overflow-hidden group border border-emerald-400/50 shadow-[0_4px_15px_rgba(0,0,0,0.3)]"
+                  >
+                    {/* Animated Shine */}
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12 translate-x-[-200%]"
+                      animate={{ translateX: ["200%", "-200%"] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    />
+                    <span className="font-black text-[11px] uppercase tracking-[0.2em] relative z-10 italic">Donar Ahora</span>
+                    <span className="relative z-10 text-lg group-hover:scale-125 transition-transform duration-300">❤️</span>
+                  </motion.button>
+                </div>
+
+
+                <div className="mt-auto pt-6 border-t border-white/5">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group text-zinc-500 hover:text-white hover:bg-white/5"
+                  >
+                    <span className="transition-transform group-hover:scale-110 text-red-500 group-hover:text-red-400">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    </span>
+                    <span className="font-medium">Cerrar Sesión</span>
+                  </button>
+                </div>
               </nav>
             </motion.aside>
           </>
@@ -220,7 +257,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             </div>
           </motion.div>
 
-          <nav className="flex flex-col gap-2">
+          <nav className="flex-1 flex flex-col gap-2 overflow-y-auto pr-2 custom-scrollbar">
             <SidebarItem to="/" icon={ICONS.Dashboard} label="Inicio" />
             <SidebarItem to="/routines" icon={ICONS.Routines} label="Rutinas" />
             <SidebarItem to="/nutrition" icon={ICONS.Nutrition} label="Nutrición" />
@@ -229,16 +266,40 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <SidebarItem to="/calendar" icon={ICONS.Calendar} label="Calendario" />
             <SidebarItem to="/profile" icon={ICONS.Profile} label="Perfil" />
 
+            <div className="px-2 mt-2">
+              <motion.button
+                whileHover={{ scale: 1.02, boxShadow: "0 0 30px rgba(16, 185, 129, 0.4)" }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => navigate('/subscription?target=donation')}
+                className="w-full flex items-center justify-center gap-3 bg-gradient-to-br from-emerald-400 to-emerald-600 text-black py-4 rounded-2xl transition-all relative overflow-hidden group border border-emerald-400/50 shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
+              >
+                {/* Advanced Shine Effect */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12 translate-x-[-200%]"
+                  animate={{ translateX: ["200%", "-200%"] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                />
+
+                {/* Subtle Radial Gradient Overlay */}
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.2),transparent_70%)] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+                <span className="font-black text-[11px] uppercase tracking-[0.2em] relative z-10 italic">Donar Ahora</span>
+                <span className="relative z-10 text-lg group-hover:scale-125 transition-transform duration-300">❤️</span>
+              </motion.button>
+            </div>
+          </nav>
+
+          <div className="mt-auto pt-4 border-t border-white/5">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group text-zinc-500 hover:text-white hover:bg-white/5"
+              className="w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-300 group text-zinc-500 hover:text-white hover:bg-white/5"
             >
               <span className="transition-transform group-hover:scale-110 text-red-500 group-hover:text-red-400">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               </span>
               <span className="font-medium">Cerrar Sesión</span>
             </button>
-          </nav>
+          </div>
         </aside>
       )}
 
@@ -274,6 +335,14 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   onFocus={() => setIsSearchFocused(true)}
                   className={`bg-transparent border-none outline-none text-white text-sm h-12 w-full placeholder:text-zinc-600 font-medium ${!isSearchFocused ? 'hidden md:block' : 'block'}`}
                 />
+                {!isSearchFocused && (
+                  <button
+                    onClick={() => navigate('/subscription?target=donation')}
+                    className="flex md:hidden items-center justify-center p-2 text-emerald-400 animate-bounce bg-emerald-500/10 rounded-xl border border-emerald-500/20"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" /></svg>
+                  </button>
+                )}
                 {isSearchFocused && searchTerm && (
                   <button onClick={() => { setSearchTerm(''); setSearchResults([]); }} className="text-zinc-500 hover:text-white">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -315,6 +384,18 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                   )}
                 </AnimatePresence>
               </div>
+
+              {/* Header Donation Shortcut (Desktop) - Enhanced Visibility */}
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(16, 185, 129, 0.4)" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => navigate('/subscription?target=donation')}
+                className="hidden md:flex ml-4 pointer-events-auto items-center gap-2 bg-emerald-500 text-black px-6 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.2)] transition-all border-none relative overflow-hidden group"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                <span className="relative z-10">Donar</span>
+                <span className="relative z-10 animate-pulse">❤️</span>
+              </motion.button>
             </div>
           </header>
         )}
@@ -388,6 +469,8 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
           </motion.div>
         )}
       </AnimatePresence>
+
+
     </div>
   );
 };

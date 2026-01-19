@@ -494,13 +494,7 @@ export const aiService = {
     },
 
     chatWithCoach: async (message: string, state: AppState): Promise<{ text: string, routine?: any }> => {
-        if (!paymentService.hasAccess(state.profile, 'ai')) {
-            return {
-                text: state.language === 'es'
-                    ? "🔒 **MODO ENTRENADOR ESTÁNDAR**\n\nEl acceso directo al Coach Neural Argon es exclusivo para miembros **PRO** y **ELITE**.\n\n**Beneficios desbloqueados:**\n- Consultas ilimitadas 24/7\n- Ajustes de rutina en tiempo real\n- Análisis de técnica detallado\n\n_Actualiza tu plan para comenzar tu evolución._"
-                    : "🔒 **STANDARD COACH MODE**\n\nDirect access to Argon Neural Coach is exclusive to **PRO** and **ELITE** members.\n\n**Unlocked Benefits:**\n- Unlimited 24/7 consultations\n- Real-time routine adjustments\n- Detailed technique analysis\n\n_Upgrade your plan to start your evolution._"
-            };
-        }
+        const isPremium = paymentService.hasAccess(state.profile, 'ai');
 
         try {
             const { data, error } = await supabase.functions.invoke('argon-ai', {
@@ -508,7 +502,8 @@ export const aiService = {
                     action: 'chat',
                     message,
                     profile: state.profile,
-                    language: state.language
+                    language: state.language,
+                    isPremium // Pass premium status to the AI
                 }
             });
 
